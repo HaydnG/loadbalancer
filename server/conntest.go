@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"loadbalancer/server/proxy"
-	"net"
 	"net/http"
 )
 
@@ -18,24 +17,25 @@ func main() {
 	http.HandleFunc("/", defaultHandler)
 
 	server := http.Server{
-		Addr:      ":8080",
-		ConnState: connStateHook,
+		Addr: ":8080",
 	}
-
+	fmt.Println("Listening")
 	server.ListenAndServe()
 
 }
 
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("Connection recieved")
-	endpoint := proxy.GetProxyByID(1)
-	fmt.Printf("Connection redirected to: %s\n", endpoint.URLtext)
-	endpoint.RedirectClient(w, r)
-	fmt.Printf("Connection finished\n")
+	endpoint, ok := proxy.GetLeastPopulated()
 
-}
+	if ok {
+		fmt.Printf("Client sent to %s active: %d \n", endpoint.URLtext, endpoint.ActiveConnections())
 
-func connStateHook(connection net.Conn, state http.ConnState) {
-	fmt.Printf("connState: %+v \n", state)
+		endpoint.CountCh <- 1
+		endpoint.RedirectClient(w, r)
+
+		endpoint.CountCh <- -1
+
+	}
+
 }

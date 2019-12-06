@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -12,14 +11,18 @@ type Endpoint struct {
 	URL               *url.URL
 	URLtext           string
 	proxy             *httputil.ReverseProxy
-	ActiveConnections int
+	activeConnections int
 	CountCh           chan int
 }
 
 var proxies = map[int]*Endpoint{
 	1: &Endpoint{
 		URLtext:           "http://localhost:5000",
-		ActiveConnections: 0,
+		activeConnections: 0,
+	},
+	2: &Endpoint{
+		URLtext:           "http://localhost:5001",
+		activeConnections: 0,
 	},
 }
 
@@ -39,7 +42,43 @@ func SetupProxies() {
 		p.SetupProxy()
 		//To accomodate for multiple client communications
 		p.CountCh = make(chan int, 10)
+		go p.count()
 	}
+}
+
+//count is a thread safe counter
+func (ep *Endpoint) count() {
+	for {
+		select {
+		case a := <-ep.CountCh:
+			ep.activeConnections += a
+		}
+	}
+}
+
+//GetLeastPopulated returns the proxy with the least connections
+func GetLeastPopulated() (*Endpoint, bool) {
+
+	low := 1000000
+	var lowp *Endpoint
+	for _, p := range proxies {
+		if p.activeConnections < low {
+
+			low = p.activeConnections
+			lowp = p
+		}
+
+	}
+	if lowp == nil {
+		return nil, false
+	}
+
+	return lowp, true
+}
+
+//ActiveConnections returns the number of clients currently on the proxy
+func (ep *Endpoint) ActiveConnections() int {
+	return ep.activeConnections
 }
 
 //SetupProxy initilises the proxy server
@@ -51,5 +90,4 @@ func (ep *Endpoint) SetupProxy() {
 //RedirectClient sends the client to the given proxy
 func (ep *Endpoint) RedirectClient(w http.ResponseWriter, r *http.Request) {
 	ep.proxy.ServeHTTP(w, r)
-	fmt.Printf("%+v", ep.proxy.ErrorLog)
 }

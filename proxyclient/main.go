@@ -16,11 +16,17 @@ func main() {
 
 	server.ListenAndServe()
 
+	server2 := http.Server{
+		Addr: ":5001",
+	}
+
+	server2.ListenAndServe()
+
 }
 
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Write([]byte("Hello you have hit a proxy\n"))
 	fmt.Printf("%+v \n", r)
-	time.Sleep(1000 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 }
